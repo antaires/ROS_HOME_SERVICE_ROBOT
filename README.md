@@ -12,7 +12,7 @@ $catkin_init_workspace
 $cd ../
 $catkin_make
 ```
-clone required repos into the source folder: 
+if any required folders are empty, please clone required repos into the source folder: 
 ```
 $ cd catkin_ws/src
 $ git clone https://github.com/ros-perception/slam_gmapping.git
