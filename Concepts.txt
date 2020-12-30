@@ -1,0 +1,156 @@
+Robotics - Path Planning
+
+* Continuous representation 
+    * Treat robot as a point, but inflate the obstacles by the radius of the robot, to prevent collisions with paths that are too narrow for the robot to fit. This adjusted map is called the configuration space
+    * C-space is set of ALL robot poses, and can be broken down into C-free and C-obs (obstacle) 
+* Minkowski Sum
+    * http://twistedoakstudios.com/blog/Post554_minkowski-sums-and-differences
+    * https://www.toptal.com/game/video-game-physics-part-ii-collision-detection-for-solid-objects
+* 3D configuration space
+    * Adding rotation adds another dimension: 
+        * x-y translation 
+        * z rotation 
+        * the obstacles become lumpy shapes showing the minkowski sum in 3D (for a 2D shape and robot - stacked to included all rotations of the robot)
+* Discritization (build a graph of a continuous environment) 
+    * Roadmap
+        * like a metro map of stops and connections
+    * Visibility Graph (complete and optimal)
+        * like a roadmap, but connects all nodes that are visible to other nodes
+        * generates shortest paths
+        * downside: passes very close to obstacles (danger for real, but ok for games)
+    * Voronoi Diagram 
+        * edges bisect free space
+        * maximizes clearance between obstacles
+        * Complete, but not optimal 
+    * Cell Decomposition 
+        * exact - non overlapping cells
+            * uses Plane-Sweep algorithm 
+            * awkward shapes, adding computational complexity 
+        * approximate - simple, regular shapes
+            * simple - more efficient but not complete
+            * iterative - a grid that divides more in areas that need it
+                * 2D: quadtree
+                * 3D: octree
+            * approaches completeness, but is not optimal 
+    * Potential Field
+        * 2 functions: 1 that attracts robot to the goal and 1 that repels the robot from objects
+        * attract: 
+            * f_attract(x) = v_scale_factor * ( |x_current - x_goal| )^2 
+        * repulsive: near zero in open space, high around obstacles 
+            * p(x) = distance to nearest obstacle
+            * p0(x) = scaling factor for object repulsiveness 
+            * f_repel(x) = 
+                * (if p <= p0) then v_scaling_factor * ( 1/p(x) - 1/p0(x))^2  
+                * ELSE if (p > p0) then 0
+        * gradient descent optimzation algorithm applied, and robot moves towards goal while avoiding obstacles (move towards lowest point)
+        * neither complete nor optimal
+* Graph Search - find finite sequence of actions form start -> goal 
+    * Uninformed Search Algorithms
+        * search blindly, no contextual relationship
+        * BFS (breadth first search)
+            * searches all nodes on a level before moving to next deeper level (usually L -> R) 
+            * radiates outward in all directions from start point
+            * uses a QUEUE (FIFO - first in first out)
+            * complete, optimal, but NOT efficient
+        * DFS (depth first search)
+            * searches deep before broadly, goes all down left branches until it reaches a leaf then goes to most recently visited node with another child, and goes that way
+            * uses a STACK (LIFO - last in first out)
+            * NOT complete, NOT optimal, NOT efficient
+        * Uniform Cost Search
+            * builds on BFS and can traverse graphs with different edge costs
+            * PATH = total cost of all edges to a node
+            * uses a PRIORITY QUEUE where priority goes to lowest PATH cost
+            * complete, optimal, NOT efficient
+    * Informed Search Algorithms 
+        * guided for intelligent decisions
+        * A* 
+            * searches for SHORTEST path in DIRECTION of goal 
+            * uses a heuristic function h(n) which estimates the distance to the goal 
+                * one option is euclidian distance from node to goal, but others can be used
+                * manhattan distance 
+            * takes into account g(n) the path cost
+            * f(n) = g(n) + h(n) 
+                * this takes into account path cost and estimated distance
+                * minimizes g(n) = favor shorter paths 
+                * minimize h(n) = favor paths in direction of goal 
+            * PRIOTITY QUEUE ordered by f(n) 
+            * NOT (always) complete, NOT (always) optimal, efficient 
+                * every edge must have cost greater than some value e, else infinite loops possible
+                * h(n) must be consistent and obey triangle inequality theorem (for edges a, b, c, h(a -> c) < h(a->b) + h(b->c)
+                * h(n) must be admissible -> h(n) must be <= true cost (and not overestimate)
+            * if g(n) and h(n) are different units (ie distance vs time) then a scaling factor is needed to adjust them before summing
+
+IN real world problems, combinatorial path planning too expensive 
+* real world cheats: redefine requirements:
+    * probabilistically complete = prob of finding a path, if one exists, increases to 1 as time -> infinity 
+    * feasible path (rather than optimal path) = one that obeys all environemtn and robot constraints. 
+Sample Based Planning 
+    * holonomic system : system where every contraint depends exclusively on the current pose and time
+    * nonholonomic system: system that depends on derivatives 
+    * rather. than discretizing entire config space, it samples randomly or semi-randomly 
+* Probabilistic Roadmap (PRM) 
+    * learning phase: generate a random map of nodes, and determine which nodes can connect (ones that aren’t separated by an obstacle) 
+        * how to find neighbors? one way is k-d tree to find k-nearest neighbors, or using distances 
+    * query phase: uses the graph to find a path from start to goal
+        * connects start & goal to graph using closest nodes, then follows up with A* to find a path.
+    * probabilistically complete 
+    * multi-query method: good for static or mildly changing environments, because learning phase takes longest, but graph may be re-used. 
+* Rapidly Exploring Random Tree Method (RRT)
+    * single-query planner : one graph per query, graph is built directed toward goal
+    * starts with start and end nodes, doesn’t add lateral connections between nodes (1 node, 1 child) and keeps nodes below a a set delta distance apart 
+    * can grow 2 trees from start and one from goal, goal is to connect 2 graphs
+    * options/parameters
+        * often sampling method: uniform (favouring open spaces) with only a small amount of bias (greedy approach toward goal) to help avoid robot getting trapped in local minima. 
+        * delta must be chosen carefully, too small = dense graph, too big = likely collisions between nodes
+    * supports non-hoolonomic systems (can take into account additional constraints like turn radius)
+    * https://webspace.science.uu.nl/~gerae101/pdf/compare.pdf
+* RRT* - variation of the above, that attempts to smooth the branches at every step. 
+* Path Smoothing
+    * path shortcutter (tries connecting 2 nodes not already connected if distance shorter than existing path and no obstacles exist)
+        * can optimize for distance, or path smoothness etc …
+* Anytime algorithm : returns a solution even if computation halted before it searches the entire space
+* https://www.cs.cmu.edu/~maxim/files/pathplanforMAV_icra13.pdf
+* Anytime Dynamic A* (AD*)
+    * can repair previous solution when changes in edge costs occur (such as new obstacles detected)
+    * heuristic : in this paper above, they used a 3D-BFS search for the heuristic
+
+Probabilistic Path Planning 
+* give negative weights to dangerous terrain, but still need to consider uncertainty of robotic position using Markov Decision Processes 
+* Markov Decision Process
+    * Recycling robot example:
+        * actions
+        * states
+        * rewards & penalties 
+        * transition model (aka one-step dynamics) = action can’t guarantee to lead robot from one state to another, instead there is an associated probability
+    * A solution is called a Policy and denoted with letter pi 
+        * a policy = a mapping from states to actions
+        * pi* = optimal policy (tells robot the best action to take from any state)
+        * every grid cell gets a reward score (eg -1 normal, -3 rough terrain, -50 hazard, 100 goal)
+            * this favours risk taking, because the goal reward is higher than the hazard
+    * State Utitliy (aka state value) = how attractive the state is with respect to the goal
+        * work backwards from goal and determine what is the optimal step from each cell
+        * find the optimal direction to take for each cell (a grid with arrows in each cell)
+    * Value iteration algorithm = algorithm to determine optimal policy 
+
+Additional Resources:
+
+mazing solving algorithm 
+https://en.wikipedia.org/wiki/Maze_solving_algorithm
+
+dynamic wall following using passive tactile sensor
+https://limbs.lcsr.jhu.edu/wp-content/uploads/2013/05/Lamperskidynamical2005.pdf
+
+frontier-based exploring
+http://robotfrontier.com/frontier/index.html
+
+autonomous visual mapping
+https://pdfs.semanticscholar.org/c3ba/044c2d2b6cfaf1100428e8f6a4b68c3e22d5.pdf
+
+map building, exploration strategies of sonar 
+https://www.cambridge.org/core/books/mapbuilding-and-exploration-strategies-of-a-simple-sonarequipped-mobile-robot/E194057572CBC5AB7085457AE28D3FD7
+
+algorithmns and framework for indoor mapping in noisy environments
+http://journals.sagepub.com/doi/full/10.5772/59992
+
+laser SLAM for indoor mobile mapping
+https://www.int-arch-photogramm-remote-sens-spatial-inf-sci.net/XLI-B4/351/2016/isprs-archives-XLI-B4-351-2016.pdf
